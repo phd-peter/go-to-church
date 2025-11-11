@@ -7,7 +7,7 @@
     async function fetchRecommendations() {
       const now = new Date();
       const hhmm = now.toTimeString().slice(0,5);
-      const res = await fetch(`https://your-render-app.onrender.com/gotochurch?now=${hhmm}`);
+      const res = await fetch(`https://go-to-church-backend.onrender.com/gotochurch?now=${hhmm}`);
       const data = await res.json();
       const list = data.recommendations.slice(0,5);
       document.getElementById('result').innerHTML = list.map(
