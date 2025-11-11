@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>교회 가는 길</title>
+  <script>
+    async function fetchRecommendations() {
+      const now = new Date();
+      const hhmm = now.toTimeString().slice(0,5);
+      const res = await fetch(`https://your-render-app.onrender.com/gotochurch?now=${hhmm}`);
+      const data = await res.json();
+      const list = data.recommendations.slice(0,5);
+      document.getElementById('result').innerHTML = list.map(
+        r => `<li><b>${r.rank}.</b> ${r.route} (${r.arrival_time})</li>`
+      ).join('');
+    }
+  </script>
+</head>
+<body class="p-4">
+  <h2>🚆 교회 가는 길 (현재시각 기준)</h2>
+  <button onclick="fetchRecommendations()">추천 보기</button>
+  <ul id="result"></ul>
+</body>
+</html>
