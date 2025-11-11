@@ -2,8 +2,9 @@ from fastapi import FastAPI
 from datetime import datetime, timedelta
 import json
 import os
-
+from fastapi.middleware.cors import CORSMiddleware
 app = FastAPI(title="Go to Church Picker", version="1.0")
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 # Load timetable data once
 BASE_DIR = os.path.dirname(__file__)
