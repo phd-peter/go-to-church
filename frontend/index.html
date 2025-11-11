@@ -2,23 +2,152 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>교회 가는 길</title>
-  <script>
-    async function fetchRecommendations() {
-      const now = new Date();
-      const hhmm = now.toTimeString().slice(0,5);
-      const res = await fetch(`https://go-to-church-backend.onrender.com/gotochurch?now=${hhmm}`);
-      const data = await res.json();
-      const list = data.recommendations.slice(0,5);
-      document.getElementById('result').innerHTML = list.map(
-        r => `<li><b>${r.rank}.</b> ${r.route} (${r.arrival_time})</li>`
-      ).join('');
-    }
-  </script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 20px; background-color: #f8f9fa; color: #333; }
+    .container { max-width: 800px; margin: 0 auto; background: white; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); overflow: hidden; }
+    header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; text-align: center; }
+    h1 { margin: 0; font-size: 1.8em; }
+    #timestamp { font-size: 1.1em; opacity: 0.9; }
+    button { background: #667eea; color: white; border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-size: 1em; margin: 20px 0; transition: background 0.3s; }
+    button:hover { background: #5a67d8; }
+    section { padding: 20px; border-bottom: 1px solid #eee; }
+    section:last-child { border-bottom: none; }
+    h2 { color: #4a5568; margin-top: 0; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; }
+    .recommendations { display: grid; gap: 15px; }
+    .card { background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; }
+    .rank { font-size: 1.2em; font-weight: bold; color: #667eea; display: inline-block; width: 30px; }
+    .route { font-weight: bold; color: #2d3748; }
+    .details { font-size: 0.9em; color: #718096; margin-top: 5px; }
+    .time { color: #38a169; font-weight: 500; }
+    .routes { display: none; } /* Hidden by default, toggle with JS */
+    .routes.active { display: block; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { padding: 10px; text-align: left; border-bottom: 1px solid #eee; }
+    th { background: #f7fafc; font-weight: 600; color: #4a5568; }
+    .toggle-btn { background: none; border: 1px solid #cbd5e0; color: #4a5568; padding: 5px 10px; border-radius: 4px; cursor: pointer; margin-left: 10px; }
+    .toggle-btn:hover { background: #edf2f7; }
+    #loading { text-align: center; color: #718096; padding: 20px; }
+    #error { color: #e53e3e; text-align: center; padding: 20px; background: #fed7d7; border-radius: 8px; margin: 20px; }
+    @media (max-width: 600px) { body { padding: 10px; } .container { margin: 10px; border-radius: 8px; } }
+  </style>
 </head>
-<body class="p-4">
-  <h2>🚆 교회 가는 길 (현재시각 기준)</h2>
-  <button onclick="fetchRecommendations()">추천 보기</button>
-  <ul id="result"></ul>
+<body>
+  <div class="container">
+    <header>
+      <h1>🚆 교회 가는 길</h1>
+      <div id="timestamp">현재 시각: --:--</div>
+    </header>
+    <section>
+      <button onclick="fetchRecommendations()">추천 보기 (실시간 업데이트)</button>
+      <div id="loading" style="display: none;">로딩 중...</div>
+      <div id="error" style="display: none;"></div>
+      <div id="recommendations"></div>
+    </section>
+    <section>
+      <h2>상세 경로 정보 <button class="toggle-btn" onclick="toggleRoutes()">전체 보기</button></h2>
+      <div id="routes" class="routes">
+        <div id="route1"></div>
+        <div id="route2"></div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    function toggleRoutes() {
+      const routes = document.getElementById('routes');
+      routes.classList.toggle('active');
+      event.target.textContent = routes.classList.contains('active') ? '숨기기' : '전체 보기';
+    }
+
+    async function fetchRecommendations() {
+      const loading = document.getElementById('loading');
+      const error = document.getElementById('error');
+      const recommendationsDiv = document.getElementById('recommendations');
+      const route1Div = document.getElementById('route1');
+      const route2Div = document.getElementById('route2');
+      const timestampDiv = document.getElementById('timestamp');
+
+      loading.style.display = 'block';
+      error.style.display = 'none';
+      recommendationsDiv.innerHTML = '';
+      route1Div.innerHTML = '';
+      route2Div.innerHTML = '';
+
+      try {
+        const now = new Date();
+        const hhmm = now.toTimeString().slice(0, 5);
+        timestampDiv.textContent = `현재 시각: ${hhmm}`;
+
+        const res = await fetch(`https://go-to-church-backend.onrender.com/gotochurch?now=${hhmm}`);
+        if (!res.ok) throw new Error(`API 에러: ${res.status}`);
+        const data = await res.json();
+
+        // Recommendations: Top 5 as cards
+        const recs = data.recommendations.slice(0, 5);
+        recommendationsDiv.innerHTML = `
+          <h3>추천 경로 (도착 시간 순)</h3>
+          <div class="recommendations">
+            ${recs.map((r, i) => {
+              const d = r.details;
+              let routeName = data.routes[r.route].name;
+              let keyTimes = '';
+              if (r.route === 'route1') {
+                keyTimes = `
+                  <div>출발: ${d['백석역 출발']} (역까지: ${d['역까지 가는 시간']}분)</div>
+                  <div>환승 대기: ${d['환승 사이시간']}분</div>
+                  <div>도착: ${r.arrival_time} (${d['둔촌동역 도착시간']})</div>
+                `;
+              } else {
+                keyTimes = `
+                  <div>출발: ${d['당산역 급행출발']} (버스+이동: ${d['버스타러가는 시간 + 버스가 당산까지 가는 시간']}분)</div>
+                  <div>도착: ${r.arrival_time} (${d['종합운동장역 도착']})</div>
+                `;
+              }
+              return `
+                <div class="card">
+                  <div><span class="rank">${r.rank}위</span> <span class="route">${routeName}</span></div>
+                  <div class="details">${keyTimes}</div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        `;
+
+        // Full Routes: Tables
+        const route1 = data.routes.route1;
+        route1Div.innerHTML = `
+          <h4>${route1.name}</h4>
+          <table>
+            <thead><tr><th>옵션</th><th>역까지</th><th>백석 출발</th><th>종로3가 도착</th><th>환승 대기</th><th>종로3가 출발</th><th>둔촌동 도착</th></tr></thead>
+            <tbody>${route1.next.map((d, i) => `<tr><td>${i+1}</td><td>${d['역까지 가는 시간']}분</td><td>${d['백석역 출발']}</td><td>${d['종로3가역 도착']}</td><td>${d['환승 사이시간']}분</td><td>${d['종로3가역 출발']}</td><td class="time">${d['둔촌동역 도착시간']}</td></tr>`).join('')}</tbody>
+          </table>
+        `;
+
+        const route2 = data.routes.route2;
+        route2Div.innerHTML = `
+          <h4>${route2.name}</h4>
+          <table>
+            <thead><tr><th>옵션</th><th>버스+이동</th><th>당산 급행 출발</th><th>종합운동장 도착</th></tr></thead>
+            <tbody>${route2.next.map((d, i) => `<tr><td>${i+1}</td><td>${d['버스타러가는 시간 + 버스가 당산까지 가는 시간']}분</td><td>${d['당산역 급행출발']}</td><td class="time">${d['종합운동장역 도착']}</td></tr>`).join('')}</tbody>
+          </table>
+        `;
+
+        // Show routes by default after load
+        document.getElementById('routes').classList.add('active');
+        document.querySelector('.toggle-btn').textContent = '숨기기';
+
+      } catch (err) {
+        error.textContent = `오류: ${err.message}. 네트워크나 서버 확인하세요.`;
+        error.style.display = 'block';
+      } finally {
+        loading.style.display = 'none';
+      }
+    }
+
+    // Initial load on page open
+    fetchRecommendations();
+  </script>
 </body>
 </html>
